@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./css/style.css">
+    <title>Kino</title>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <div class="scroll-container"></div>
+            <div class="window" v-if="messageWindowEnable"><div class="window_text" :style="'color:' + messageColor + ';'">{{messageWindowText}}</div><button class="window_close" @click="messageWindowEnable = false">x</button></div>
+            <header class="convex">
+                <img src="./media/images/logo.png" alt="" class="header_logo">
+                <nav class="navMenu" @click.prevent>
+                    <a class="navMenu_item" @click="ChangePage('О нас')">О нас</a>
+                    <a class="navMenu_item" @click="ChangePage('Где нас найти')">Где нас найти</a>
+                    <a class="navMenu_item" @click="ChangePage('Каталог')">Каталог</a>
+                    <a v-if="currentUser" class="navMenu_item" @click="ChangePage('Корзина')">Корзина</a>
+                    <a v-if="!currentUser" class="navMenu_item" @click="ChangePage('Авторизация')">Авторизация</a>
+                    <a v-if="currentUser" class="navMenu_item" @click="ChangePage('Личный кабинет')">Личный кабинет</a>
+                    <a v-if="currentUser ? currentUser.isAdmin : false" class="navMenu_item" @click="ChangePage('Админ панель')">Админ панель</a>
+                </nav>
+            </header>
+            <section class="aboutUs page" v-if="currentPage === 'О нас'">
+                <h2>О нас</h2>
+                <div class="aboutUs_info">
+                    <img src="./media/images/logo.png" alt="" class="aboutUs_info_logo">
+                    <div class="aboutUs_info_motto">Cinema productions - фильмы и сериалы - всегда и везде!</div>
+                </div>
+
+                <h2>Новинки</h2>
+                <!-- Слайдер -->
+                <div class="slider convex"> 
+                    <div class="slides" :style="'transform: translateX('+ currentSlideIndex * -20 +'%);'">
+                        <div class="slide" v-for="slide in slides">
+                            <img :src="slide.img" alt="" class="slide_img"><div class="slide_name">{{slide.name}}</div>
+                        </div>
+                    </div>
+                    <div class="slider_nav">
+                        <div v-for="item in slides" class="bar" :style="'width:'+ 70 / slides.length +'%;'" @click="currentSlideIndex = item.id" :class="{disabled: currentSlideIndex != item.id}"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="findUs page" v-if="currentPage === 'Где нас найти'">
+                <h2>Где мы на карте</h2>
+                <!-- карта -->
+                <img src="./media/images/map.jpg" alt="" class="map">
+                <div class="aboutUs_info">
+                    <span>Телефон: 8 800 555 35 35</span><span>Адрес: Калинина 6</span><span>Email: cinemaproductions@mail.ru</span>
+                </div>
+            </section>
+            <section class="katalog page" v-if="currentPage === 'Каталог'">
+                <!-- фильтры -->
+                <div class="filters" :style="'height: calc('+ filterCategories.length / 3 * 0.07 +'* 100vw);'">
+                    <div class="filters_filter">
+                        <button class="filters_filter_item"  :class="{current: filterTypeIndex === category.id}"  @click="filterTypeIndex = category.id" v-for="category in filterCategories">{{category.name}}</button>
+                    </div>
+                    <div class="filters_sort">
+                        <button class="filters_sort_btn" @click="sortMenuEnable = !sortMenuEnable">Сортировка по: {{sortType}}</button>
+                        <div class="filters_sort_menu" v-if="sortMenuEnable">
+                            <button class="filters_sort_menu_item" :class="{current: sortType === 'цене'}" @click="sortType = 'цене'">цене</button>
+                            <button class="filters_sort_menu_item" :class="{current: sortType === 'наименованию'}" @click="sortType = 'наименованию'">наименованию</button>
+                            <button class="filters_sort_menu_item" :class="{current: sortType === 'году производства'}" @click="sortType = 'году производства'">году производства</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- продукты -->
+                <div class="content">
+                    <div class="product convex" v-for="item in ProductsSort(ProductsFilter(products))">
+                        <img :src="item.img" alt="" class="product_img">
+                        <div class="product_name">{{item.name}}</div>
+                        <div class="product_price">{{item.price}}р</div>
+                        <button class="product_btn" @click="DetailEnable(item.id)">Детально</button>
+                    </div>
+                </div>
+            </section>
+            <!-- Корзина -->
+            <section class="basket page" v-if="currentPage === 'Корзина'">
+                <div class="center" v-if="currentUser.basket.length === 0">
+                    <div class="empty">
+                        <h2>Корзина пуста!</h2>
+                        <button @click="ChangePage('Каталог')">К товаром</button>
+                    </div>
+                </div>
+                <div class="notEmpty" v-if="currentUser.basket.length > 0">
+                    <div class="basket_content convex">
+                        <h2>Корзина</h2>
+                        <div class="basket_product convex" v-for="item in currentUser.basket">
+                            <img :src="item.img" alt="" class="basket_product_img">
+                            <div class="basket_porduct_name">{{item.name}}</div>
+                            <div class="basket_product_price">{{item.price}}р</div>
+                            <button class="basket_product_btn" @click="BasketDelete(item)">Удалить</button>
+                        </div>
+                        <div class="totalPriceText">Общая стоимость: {{ArraySum(currentUser.basket, 'price')}}</div>
+                    </div>
+                    <div class="basket_control">
+                        <button class="basketBye" @click="basket = []">Удалить все товары</button>
+                        <button class="basketBye" @click="Bye()">Оформить заказ</button>
+                    </div>
+                </div>
+            </section>
+            <!-- страница авторизации -->
+            <section class="login page" v-if="currentPage === 'Авторизация'">
+                <div class="center">
+                    <form action="" class="convex" onsubmit="return false">
+                        <h3>Авторизация</h3>
+                        <div class="form_item"><input type="text" class="form_field" placeholder="Логин" v-model="loginLoginField"></div>
+                        <div class="form_item"><input type="password" class="form_field" placeholder="Пароль" v-model="loginPasswordField"></div>
+                        <input type="submit" class="form_submit" value="Войти" @click="OnLogin()">
+                        <button class="formLink" @click="ChangePage('Регистрация')">Нет аккаунта? <br> Зарегестрируйся!</button>
+                    </form>
+                </div>
+            </section>
+            <!-- страница регистрации -->
+            <section class="registration page" v-if="currentPage === 'Регистрация'">
+                <div class="center" style="margin-top: 50px;">
+                    <form action="" class="convex" onsubmit="return false" novalidate>
+                        <h3>Регистрация</h3>
+                        
+                        <div class="form_fields">
+                            <div class="form_columnFirst">
+                                <input type="text" class="form_field" placeholder="Логин" v-model="registrationLoginField">
+                                <input type="email" class="form_field" placeholder="Email" v-model="registrationEmailField">
+                                <input type="password" class="form_field" placeholder="Пароль" v-model="registrationPasswordField">
+                                <input type="password" class="form_field" placeholder="Повторите пароль" v-model="registrationPasswordRepeatField">
+                            </div>
+                            <div class="form_columnSecond">
+                                <input type="text" class="form_field" placeholder="Имя" v-model="registrationNameField">
+                                <input type="text" class="form_field" placeholder="Фамилия" v-model="registrationSurnameField">
+                                <input type="text" class="form_field" placeholder="Отчество" v-model="registrationPatronymicField">
+                                <div class="form_item"><div class="form_item_text">Согласия с правилами</div><input type="checkbox" class="form_item_checkbox" v-model="registrationCheckBox"></div>
+                            </div>
+                        </div>
+                        
+                        <input type="submit" class="form_submit" value="Авторизоваться" @click="OnRegistration()">
+
+                        <button class="formLink" @click="ChangePage('Авторизация')">Есть аккаунта? <br> Войди!</button>
+                    </form>
+                </div>
+            </section>
+            <!-- детальный обзор товара -->
+            <section class="detail page" v-if="currentPage === 'Детальный обзор'">
+                <div class="center">
+                    <div class="convex detailProduct">
+                        <button class="btn_return" @click="ChangePage('Каталог')">Вернуться</button>
+                        <img :src="currentProduct.img" alt="" class="detailProduct_img">
+                        <div class="detailProduct_info">
+                            <h2 class="detailProduct_name">{{currentProduct.name}}</h2>
+                            <div class="detailProduct_description" :class="{scroll: currentProduct.description.length > 350}">{{currentProduct.description}}</div>
+                            <div class="detailProduct_price">{{currentProduct.price}}р</div>
+                            <button class="detailProduct_btn" @click="BasketAdd(currentProduct)">Добавить в корзину</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Страница оформления заказа -->
+            <section class="page" v-if="currentPage === 'Оформление заказа'">
+                <div class="orderPage">
+                    <h2>Статус заказа: {{whichUserOrders.orders.find(order => order.id === currentOrderIndex).status}}</h2>
+                    <div class="order_content convex">
+                        <div class="order_product convex" v-for="product in whichUserOrders.orders.find(order => order.id === currentOrderIndex).content">
+                            <img :src="product.img" alt="" class="basket_product_img">
+                            <div class="basket_porduct_name">{{product.name}}</div>
+                            <div class="basket_product_price">{{product.price}}р</div>
+                        </div>
+                    </div>
+                    <button @click="ChangePage(lastPage)">Назад</button>
+                </div>
+            </section>
+            <!-- Личный кабинет -->
+            <section class="page accountPage" v-if="currentPage === 'Личный кабинет'">
+                <h2>Личный кабинет</h2>
+                <h3>Заказы</h3>
+                <h3 v-if="currentUser.orders.length === 0">У вас пока нет заказов.</h3>
+                <button @click="ChangePage('Каталог')" v-if="currentUser.orders.length === 0">К товаром</button>
+                <div class="order convex" v-for="order in currentUser.orders">
+                    <div class="order_count">{{order.content.length}} фильмов</div>
+                    <div class="order_totalPrice">{{ArraySum(order.content, 'price')}}руб.</div>
+                    <div class="order_status">{{order.status}}</div>
+                    <button @click="OrderReveal(currentUser, order.id)">Детально</button>
+                </div>
+                <button class="btnExit" @click="LogOut()">Выйти</button>
+            </section>
+            <!-- Админ панель -->
+            <section class="page" v-if="currentPage === 'Админ панель'">
+                <h2>Админ панель</h2>
+                <div class="adminPage">
+                    <button @click="ChangePage('Заказы')">Заказы</button>
+                    <button @click="ChangePage('Создание товара')">Редактировать товары</button>
+                    <button>Редактировать категории</button>
+                </div>
+            </section>
+            <!-- Разрешение заказов(Админ) -->
+            <section class="page" v-if="currentPage === 'Заказы'">
+                <h2>Заказы</h2>
+                <div class="ordersAdmin convex" v-for="user in users">
+                    <h3>{{user.login}}</h3>
+                    <div class="orderAdmin_orders" v-for="order in user.orders">
+                        <div class="order_count">{{order.content.length}} фильмов</div>
+                        <div class="order_totalPrice">{{ArraySum(order.content, 'price')}}руб.</div>
+                        <div class="order_status">
+                            <button class="filters_sort_btn" @click="sortMenuEnable = !sortMenuEnable">Статус: {{order.status}}</button>
+                            <div class="filters_sort_menu" v-if="sortMenuEnable">
+                                <button class="filters_sort_menu_item" :class="{current: order.status === 'На рассмотрении'}" @click="order.status = 'На рассмотрении'">На рассмотрении</button>
+                                <button class="filters_sort_menu_item" :class="{current: order.status === 'Одобрен'}" @click="order.status = 'Одобрен'">Одобрен</button>
+                                <button class="filters_sort_menu_item" :class="{current: order.status === 'Отклонён'}" @click="order.status = 'Отклонён'">Отклонён</button>
+                            </div>
+                        </div>
+                        <button @click="OrderReveal(user, order.id)">Детально</button>
+                    </div>
+                </div>
+            </section>
+            <section class="page" v-if="currentPage === 'Редактирование поста'">
+                <div class="center">
+                    <form onsubmit="return false" class="basket_content convex">
+                        <h2>Редактирование поста</h2>
+                        <!-- {id:0, img:'' genre:['Игры разума', 'Все'] name:'' yearOfCreation: price: rating: description:''}, -->
+                        <div class="filters" :style="'height: '+ filterCategories.length / 3 * 70+'px;'">
+                            <div class="filters_sort">
+                                <button class="filters_sort_btn" @click="sortMenuEnable = !sortMenuEnable">Сортировка по: {{sortType}}</button>
+                                <div class="filters_sort_menu" v-if="sortMenuEnable">
+                                    <button v-for="item in filterCategories" class="filters_sort_menu_item" :class="{current: sortType === 'цене'}" @click="sortType = 'цене'">{{item.name}}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </div>
+</body>
+<script src="./js/vue.global.js"></script>
+<script src="./js/main.js"></script>
+</html>
